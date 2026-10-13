@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voucher Entri Transaksi Kas Keluar</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #172033; background: #f4f6fa; }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 1100px; margin: auto; background: white; padding: 24px; border-radius: 14px; box-shadow: 0 4px 18px #18243a12; }
+    h1 { margin-top: 0; font-size: 1.6rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 14px; }
+    label { display: block; font-weight: 600; font-size: .92rem; margin-bottom: 6px; }
+    input, select { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #cbd2df; border-radius: 7px; }
+    .field { margin-bottom: 14px; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 650px; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #e1e6ef; padding: 9px; text-align: left; }
+    th { background: #f6f8fb; }
+    td input, td select { min-width: 100px; }
+    .summary { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; }
+    .total { background: #f6f8fb; padding: 12px 16px; border-radius: 8px; }
+    #status { padding: 12px; border-radius: 8px; font-weight: 700; margin: 12px 0; }
+    .balanced { color: #12653a; background: #e4f7ec; }
+    .unbalanced { color: #8a4a00; background: #fff1d9; }
+    button { cursor: pointer; padding: 10px 14px; border: 0; border-radius: 7px; background: #1e40af; color: white; font-weight: 600; margin: 4px 4px 4px 0; }
+    button.secondary { background: #e6eaf2; color: #172033; }
+    button:disabled { background: #aab2c1; cursor: not-allowed; }
+    .note { color: #566174; font-size: .9rem; line-height: 1.5; }
+    @media (max-width: 600px) { body { padding: 10px; } main { padding: 16px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Voucher Entri Transaksi Kas Keluar</h1>
+  <p class="note">Purwarupa antarmuka. Form ini menghitung debit-kredit di browser, tetapi belum menyimpan data ke Supabase.</p>
+  <form id="voucherForm">
+    <div class="grid">
+      <div class="field"><label for="date">Tanggal transaksi</label><input id="date" type="date" required></div>
+      <div class="field"><label for="reference">Nomor referensi</label><input id="reference" type="text" placeholder="Contoh: KK-001" required></div>
+      <div class="field"><label for="user">Dibuat oleh</label><input id="user" type="text" placeholder="Nama pengguna" required></div>
+      <div class="field"><label for="description">Deskripsi transaksi</label><input id="description" type="text" placeholder="Keterangan pembayaran" required></div>
+    </div>
+    <h2>Detail jurnal</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Kode akun</th><th>Nama akun</th><th>Debit (Rp)</th><th>Kredit (Rp)</th><th>Aksi</th></tr></thead>
+        <tbody id="lines"></tbody>
+      </table>
+    </div>
+    <button type="button" id="addLine" class="secondary">+ Tambah baris</button>
+    <div class="summary">
+      <div class="total">Total debit: <strong id="totalDebit">Rp0</strong></div>
+      <div class="total">Total kredit: <strong id="totalCredit">Rp0</strong></div>
+    </div>
+    <div id="status" class="unbalanced" role="status">BELUM SEIMBANG</div>
+    <button id="submitBtn" type="submit" disabled>Submit (demo)</button>
+  </form>
+  <p id="message" class="note" aria-live="polite"></p>
+</main>
+<script>
+const accounts = [
+  { code: "101", name: "Kas" },
+  { code: "501", name: "Beban Operasional" },
+  { code: "201", name: "Utang Usaha" }
+];
+const lines = document.getElementById("lines");
+const money = n => new Intl.NumberFormat("id-ID", {style:"currency",currency:"IDR",maximumFractionDigits:2}).format(n);
+function addRow() {
+  const tr = document.createElement("tr");
+  const accountCell = document.createElement("td");
+  const select = document.createElement("select");
+  select.setAttribute("aria-label","Akun");
+  select.innerHTML = '<option value="">Pilih akun</option>' + accounts.map(a => `<option value="${a.code}">${a.code} - ${a.name}</option>`).join("");
+  accountCell.appendChild(select);
+  const nameCell = document.createElement("td"); nameCell.textContent = "—";
+  select.addEventListener("change", () => { nameCell.textContent = accounts.find(a=>a.code===select.value)?.name || "—"; validate(); });
+  const debitCell = document.createElement("td");
+  const debit = document.createElement("input"); debit.type="number"; debit.min="0"; debit.step="0.01"; debit.value="0"; debit.setAttribute("aria-label","Debit");
+  debitCell.appendChild(debit);
+  const creditCell = document.createElement("td");
+  const credit = document.createElement("input"); credit.type="number"; credit.min="0"; credit.step="0.01"; credit.value="0"; credit.setAttribute("aria-label","Kredit");
+  creditCell.appendChild(credit);
+  const actionCell = document.createElement("td");
+  const remove = document.createElement("button"); remove.type="button"; remove.className="secondary"; remove.textContent="Hapus";
+  remove.addEventListener("click",()=>{ tr.remove(); validate(); });
+  actionCell.appendChild(remove);
+  [debit,credit].forEach(input=>input.addEventListener("input",()=>{ if(input===debit && Number(debit.value)>0) credit.value="0"; if(input===credit && Number(credit.value)>0) debit.value="0"; validate(); }));
+  tr.append(accountCell,nameCell,debitCell,creditCell,actionCell); lines.appendChild(tr); validate();
+}
+function validate() {
+  let debit=0, credit=0, validRows=0, valid=true;
+  [...lines.rows].forEach(row=>{
+    const account=row.cells[0].querySelector("select").value;
+    const d=Number(row.cells[2].querySelector("input").value||0);
+    const c=Number(row.cells[3].querySelector("input").value||0);
+    if(account && (d>0 || c>0) && !(d>0 && c>0)) validRows++;
+    if(!account || d<0 || c<0 || (d===0&&c===0) || (d>0&&c>0)) valid=false;
+    debit+=d; credit+=c;
+  });
+  document.getElementById("totalDebit").textContent=money(debit);
+  document.getElementById("totalCredit").textContent=money(credit);
+  const balanced=valid && validRows>=2 && debit>0 && debit===credit;
+  const status=document.getElementById("status");
+  status.textContent=balanced?"SEIMBANG":"BELUM SEIMBANG";
+  status.className=balanced?"balanced":"unbalanced";
+  document.getElementById("submitBtn").disabled=!(balanced && document.getElementById("date").value && document.getElementById("reference").value.trim() && document.getElementById("user").value.trim() && document.getElementById("description").value.trim());
+}
+document.getElementById("addLine").addEventListener("click",addRow);
+["date","reference","user","description"].forEach(id=>document.getElementById(id).addEventListener("input",validate));
+document.getElementById("voucherForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  validate();
+  if(document.getElementById("submitBtn").disabled) return;
+  document.getElementById("message").textContent="Validasi antarmuka berhasil. Data BELUM disimpan ke database karena koneksi Supabase belum diimplementasikan.";
+});
+addRow(); addRow();
+</script>
+</body>
+</html>

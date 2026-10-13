@@ -1,0 +1,4 @@
+-- TEMPEL definisi lengkap CREATE OR REPLACE FUNCTION public.post_journal(...)
+-- yang sudah berhasil kamu uji di Supabase.
+-- File ini sengaja berupa template karena definisi fungsi persis dari proyekmu
+-- tidak tersedia di sini. Jangan jalankan file ini sebelum diisi dengan definisi lengkap.
