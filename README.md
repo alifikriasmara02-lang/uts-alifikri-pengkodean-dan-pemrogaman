@@ -1,5 +1,9 @@
 # Purwarupa Voucher Kas Keluar
 
+Nama: Ali Fikri Asmara
+NIM: 12030124120074
+Kelas: D
+
 ## Deskripsi
 
 Proyek ini merupakan purwarupa modul Voucher Entri Transaksi Kas Keluar untuk mata kuliah Pemrograman/Coding. Sistem menggunakan Supabase PostgreSQL untuk menyimpan data akun dan jurnal serta menerapkan pengendalian dasar pada transaksi yang sudah diposting.
